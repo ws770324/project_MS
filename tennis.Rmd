@@ -1,0 +1,215 @@
+---
+title: ''
+output: word_document
+---
+
+# Introduction
+
+# Maximum Likelihood Estimation 
+
+Logistic regression model has a form of 
+$$
+\log \left[ \frac{\pi(y=1|\mathbf{x})}{\pi(y=0|\mathbf{x})}\right] = \beta_0 + \sum^p_{i=1} \beta_i x_i
+$$
+which is equivalent to
+$$
+\pi(y=1|\mathbf{x}) = \frac{\exp(\beta_0+\sum^p_{i=1} \beta_i x_i)}{1+\exp(\beta_0+\sum^p_{i=1} \beta_i x_i)}
+$$
+Since the binary outcome, $y$, follows a binomial distribution with probability $\pi(y=1|\mathbf{x})$, the likelihood function of the model parameters is
+$$
+L(\beta_0, \cdots, \beta_p|\mathbf{x}, y) = \prod^n_{j=1}\left[\frac{\exp(\beta_0+\sum^p_{i=1} \beta_i x_{ij})}{1+\exp(\beta_0+\sum^p_{i=1} \beta_i x_{ij})}\right]^{y_j} \left[\frac{1}{1+\exp(\beta_0+\sum^p_{i=1} \beta_i x_{ij})}\right]^{1-y_j}
+$$
+and the MLEs of the model parameters, $(\hat{\beta}_0, \cdots, \hat{\beta}_p)$, are found by maximizing the likelihood function.
+
+
+```{r Data input, echo = F, message = F}
+require(Hmisc)
+require(MASS)
+require(car)
+require(ResourceSelection)
+
+setwd('/Users/tiger/Dropbox/JT/Final Project/')
+auo <- read.table('./data/AUO 2017.txt', header = F, sep = ',')
+auo.1 <- auo[which(auo[, 7] <= 163), ]    # First rounds
+win <- auo.1[, c(8:17, 32:40)]; colnames(win) <- paste0('V', 1:19)
+los <- auo.1[, c(18:27, 41:49)]; colnames(los) <- paste0('V', 1:19)
+auo.2 <- rbind(win, los)
+colnames(auo.2) <- c('id', 'seed', 'entry', 'name', 'hand', 'ht',
+                     'ioc', 'age', 'rank', 'rank_points', 'ace',
+                     'df', 'svpt', 'first_in', 'first_won', 'second_won',
+                     'svgms', 'bp_saved', 'bp_faced')
+attach(auo.2)
+second_lose <- svpt-first_in-df-second_won
+save_rate <- ifelse(bp_faced != 0, bp_saved/bp_faced, 1)
+first_rate <- first_won/first_in
+second_rate <- second_won/(second_lose+second_won)
+result <- rep(c(1, 0), each = 64)
+detach(auo.2)
+
+auo.3 <- auo.2[, c('age', 'ace', 'df', 'svpt', 'first_in', 'first_won',
+                   'second_won', 'svgms', 'bp_saved', 'bp_faced')]
+firstrd <- cbind(auo.3, second_lose, save_rate, first_rate, second_rate, result)
+firstsig <- firstrd[, c('ace', 'df', 'bp_saved', 'bp_faced', 'second_lose',
+                        'save_rate', 'first_rate', 'second_rate')]
+```
+
+# Model Selection
+
+We started with the full model, which includes the covariates showing significant difference in the means between the winners and the losers.
+
+```{r, echo = F}
+# Logistic regression
+firstwork <- cbind(firstsig, result)
+out.1 <- glm(result ~ ., data = firstwork, family = 'binomial')
+summary(out.1)
+```
+
+Using Akaike Information Criterion (AIC) as the selection criterion, we performed backward and bi-directional stepwise selection. The two procedure gave the same final model, which includes (1) double fault, (2) break point-saved rate, (3) first serve-won rate, and (4) second serve-won rate.
+
+```{r, echo = F}
+final <- glm(result ~ df+save_rate+first_rate+second_rate,
+             data = firstwork, family = binomial)
+summary(final)
+```
+
+
+# Interpreting the Model
+
+Since all the covariates in this dataset are continuous variable, the estimated regression coefficients represent the log-transformed odds ratio (OR) of winning a match as the corresponding covariates increase in one unit. However, break point-saved rate (save_rate), first serve-won rate (first_rate), and second serve-won rate (second_rate) range from 0 to 1, so we chose to calculate the ORs as these covariates increase in 0.1 instead.
+
+```{r, echo = F}
+est <- c(exp(final$coefficient[2]), exp(final$coefficients[3:5]*0.1))
+names(est) <- c('df (+1)', 'save_rate (+0.1)', 'first_rate (+0.1)', 'second_rate (+0.1)')
+est
+```
+
+One unit of increase in double fault decreases the OR of winning a match about two-third, while 10% of increase in break point-saved rate, first serve-won rate, and second serve-won rate increases the OR around 1.5, 16, and 2.2 folds.
+
+
+# Goodness of Fit
+
+We used likelihood ratio test to investigate the contribution of each covariate.
+
+```{r, echo = F}
+# Goodness of fit
+anova(final, test = 'LRT')
+```
+
+The entry of each covariate significantly improves the model fitting according to the deviance, which approximately follows a $\chi^2(1)$ distribution (by Wilk's theorem). We then used Hosmer-Lemeshow Test to test the goodness of fit.
+
+```{r, echo = F}
+hoslem.test(final$y, fitted(final))
+```
+
+The $p$-value indicates there is no significant disagreement between the observed and expected outcomes.
+
+
+# Collinearity
+
+We first explored the correlation between covariates using scatter plots and Pearson correlation coefficient. 
+
+```{r, echo = F}
+# Collinearity between first_rate and second_rate
+firstreg <- firstrd[, c('df', 'save_rate', 'first_rate', 'second_rate')]
+pairs(firstreg, col = ifelse(result == 0, 4, 2))
+rcorr(as.matrix(firstreg))
+```
+
+There are siginificant correlations among break point-saved rate, first serve-won rate, and second serve-won rate. The correlation coefficients are around 0.4. To investigate the impact of these collinearities, we calculated the variance inflation factor (VIF) for each covariate.
+
+```{r, echo = F}
+# Variance inflation factor
+vif(final)
+```
+
+It is clear that none of the covariate has VIF larger than 5, indicating there is no severe collinearity.
+
+
+# Conclusion
+
+We analyzed the players' performance data from the first round of match in Australia Open 2017. Using logistic regression, we identified the factors that are associated with the result of the match. Qualitatively, the prediction of these factors are intuitive, since the factors for 'good' performance (break point-saved rate, first serve-won rate, and second serve-won rate) are postively correlated with the probability of winning a match, while double fault, the factor for 'bad' performance, is negatively correlated. Also, we see that three out of the four covariates included in the final model are indicators of the player's performance on serving (double fault, first serve-won rate, and second serve-won rate). This agrees with the consensus that, unlike badminton or table tennis, the quality of serving in tennis is relatively critical for scoring.
+
+
+# Appendix: R code
+
+```{r, eval = F}
+require(Hmisc)
+require(MASS)
+require(car)
+require(ResourceSelection)
+
+setwd('/Users/tiger/Dropbox/JT/Final Project/')
+auo <- read.table('./data/AUO 2017.txt', header = F, sep = ',')
+auo.1 <- auo[which(auo[, 7] <= 163), ]    # First rounds
+win <- auo.1[, c(8:17, 32:40)]; colnames(win) <- paste0('V', 1:19)
+los <- auo.1[, c(18:27, 41:49)]; colnames(los) <- paste0('V', 1:19)
+auo.2 <- rbind(win, los)
+colnames(auo.2) <- c('id', 'seed', 'entry', 'name', 'hand', 'ht',
+                     'ioc', 'age', 'rank', 'rank_points', 'ace',
+                     'df', 'svpt', 'first_in', 'first_won', 'second_won',
+                     'svgms', 'bp_saved', 'bp_faced')
+attach(auo.2)
+second_lose <- svpt-first_in-df-second_won
+save_rate <- ifelse(bp_faced != 0, bp_saved/bp_faced, 1)
+first_rate <- first_won/first_in
+second_rate <- second_won/(second_lose+second_won)
+result <- rep(c(1, 0), each = 64)
+detach(auo.2)
+
+auo.3 <- auo.2[, c('age', 'ace', 'df', 'svpt', 'first_in', 'first_won',
+                   'second_won', 'svgms', 'bp_saved', 'bp_faced')]
+firstrd <- cbind(auo.3, second_lose, save_rate, first_rate, second_rate, result)
+var.name <- names(firstrd)
+
+# Summary statistics (Table 1)
+out <- c()
+for (i in 1:14){
+  xx <- firstrd[, var.name[i]]
+  mt <- mean(xx)
+  st <- sd(xx)
+  mm <- tapply(xx, result, mean)
+  ss <- tapply(xx, result, sd)
+  test <- t.test(xx ~ result)
+  out <- rbind(out, c(mt, st, mm[1], ss[1], mm[2], ss[2], round(test$p.value, 3)))
+  
+}
+rownames(out) <- var.name[1:14]
+colnames(out) <- c('Mean (total)', 'SD (total)', 'Mean (win)', 'SD (win)',
+                   'Mean (lose)', 'SD (lose)', 'p.value')
+out
+
+# Correlations among independent variables
+firstsig <- firstrd[, c('ace', 'df', 'bp_saved', 'bp_faced', 'second_lose',
+                        'save_rate', 'first_rate', 'second_rate')]
+pairs(firstsig, cex = 0.7, col = ifelse(result == 0, 4, 2))
+rcorr(as.matrix(firstsig))
+
+# Logistic regression
+firstwork <- cbind(firstsig, result)
+out.1 <- glm(result ~ ., data = firstwork, family = 'binomial')
+summary(out.1)
+
+# Backward selection
+stepAIC(out.1)
+# Bi-directional selection
+stepAIC(out.1, scope = list(upper = ~., lower = ~1))
+
+final <- glm(result ~ df+save_rate+first_rate+second_rate,
+             data = firstwork, family = binomial)
+summary(final)
+
+# Interpretation of model (odds ratio)
+exp(final$coefficient)
+confint(final)
+
+# Goodness of fit
+anova(final, test = 'LRT')
+hoslem.test(final$y, fitted(final))
+
+# Collinearity between first_rate and second_rate
+firstreg <- firstrd[, c('df', 'save_rate', 'first_rate', 'second_rate')]
+pairs(firstreg, col = ifelse(result == 0, 4, 2))
+
+# Variance inflation factor
+vif(final)
+```
