@@ -1,0 +1,311 @@
+---
+title: "Categorical Data Analysis Project 2"
+author: "Joe"
+date: "2019/4/27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+setwd('C:\\Users\\User\\Desktop\\Ctaegorical Data Analysis\\Project 2')
+train <- read.table('./project.1.data.2.train.txt', sep=',')
+test <- read.table('./project.1.data.2.test.txt', sep=',')
+
+# Summary Statistics
+str(train)
+
+for (i in c(1,4:7,9,10,12,13)){
+print(i)
+print(table(train[,i],train[,16])/nrow(train))
+}
+
+for (i in c(1,4:7,9,10,12,13)){
+  tab.1 <- table(train[,i], train[,16])
+  print(i)
+  print(chisq.test(tab.1))
+}
+
+
+train = within(train, {
+  V2 = as.numeric(V2)
+  V14 = as.numeric(V14)
+})
+
+pos <- which(train[,16] == '+')
+neg <- which(train[,16] == '-')
+
+for (i in c(2,3,8,11,14,15)){
+  print(mean(train[pos,i]))
+}
+for (i in c(2,3,8,11,14,15)){
+  print(mean(train[neg,i]))
+}
+for (i in c(2,3,8,11,14,15)){
+  print(sd(train[pos,i]))
+}
+for (i in c(2,3,8,11,14,15)){
+  print(sd(train[neg,i]))
+}
+
+summary(train[pos,15])
+summary(train[neg,15])
+
+for (i in c(2,3,8,11,14,15)){
+print(i)
+print(t.test(train[pos,i], train[neg,i]))
+}
+
+
+# data cleaning
+which(train == '?')
+index <- c()
+for (i in 1:nrow(train)){
+  if (any(train[i,] == '?')){
+    index <- cbind(index, i)
+  }
+}
+train.1 <- train[-index,]
+
+train.1 = within(train.1, {
+  V2 = as.numeric(V2)
+  V14 = as.numeric(V14)
+})
+
+train.1$V16 <- ifelse(train.1$V16 == '+', 1, 0)
+
+index4 <- which(train.1$V4 %in% 'l')
+index5 <- which(train.1$V5 %in% 'gg')
+index6 <- which(train.1$V6 %in% 'r')
+index7 <- which(train.1$V7 %in% c('dd', 'j', 'n', 'o', 'z'))
+index13 <- which(train.1$V13 %in% 'p')
+remove <- unique(c(index4, index5, index6, index7, index13))
+train.1 <- train.1[-remove,]
+
+
+# plot & table
+
+barplot(train.1$V115)
+for (i in c(1,4:7,9,10,12,13)){
+table.1 <- table(train.1[,i], train.1[,16])
+print(colnames(train.1)[i])   ###
+print(table.1)
+}
+
+# full model
+fit.1 <- glm(V16 ~ ., data = train.1, family = 'binomial')
+
+# model selection: V16 ~ V4 + V6 + V9 + V11 + V14 + V15
+fit.null <- glm(V16 ~ 1, data = train.1, family = 'binomial')
+select.1 <- step(fit.1, direction='backward')
+select.2 <- step(fit.null, scope = list(lower=fit.null, upper=fit.1), direction = 'forward')
+select.3 <- step(fit.1, scope=list(lower=fit.null, upper=fit.1), direction='both')
+
+fit.2 <- glm(V16 ~ V4 + V6 + V9 + V11 + V14 + V15, family= 'binomial', data = train.1)
+
+
+# selected mode: leave-one-out
+n_correct = 0
+for (i in 1:nrow(train.1)){
+  out.train = train.1[-i,]
+  out.test = train.1[i,]
+  fit.out <- glm(V16 ~ V4 + V6 + V9 + V11 + V14 + V15, data = out.train, family='binomial')
+  if (predict(fit.out, out.test, type='response')>0.5){
+    Y.pred=1
+  }
+  else{
+    Y.pred=0
+  }
+  if (test$V16 == Y.pred ){
+    n_correct = n_correct + 1
+  }
+}
+n_correct / nrow(train.1)
+
+# selected model: ROC
+sen <- c()
+spe <- c()
+acc <- c()
+cutoff <- seq(0,1,0.01)
+for (k in 1:length(cutoff)){
+y.pred <-c()
+for ( i in 1:nrow(train.1)){
+  train.auc <- train.1[-i,]
+  test.auc <- train.1[i,]
+  fit.auc <- glm(train.auc$V16 ~ V4 + V6 + V9 + V11 + V14 + V15, data = train.auc, family = 'binomial')
+  if (predict(fit.auc, test.auc, type = 'response') > cutoff[k]) {
+    y.pred[i] = 1
+  }else{
+    y.pred[i] = 0
+  }
+}
+  y.pred <- factor(y.pred, levels = c('0', '1'))
+  pred.obs <- as.matrix(table(y.pred, train.1$V16))
+  true.obs <- colSums(pred.obs)
+  sen[k] = pred.obs[2,2] / true.obs[2]
+  spe[k] = pred.obs[1,1] / true.obs[1]
+  acc[k]= (pred.obs[2,2] + pred.obs[1,1]) / sum(true.obs)
+}
+
+
+load(file = './categorical_q1.rdata')
+
+plot(1-spe, sen, type = 's',
+     xlab = '1-Specificity', ylab = 'Sensitivity')
+auc <- sum(sen[-101]*(spe[-1]-spe[-101]))
+
+
+
+# Best cutoff
+cut.all <- cbind(cutoff, spe+sen)
+which.max(cut.all[, 2])
+cut.all[43,]
+
+
+# test accuracy
+fit.2 <- glm(V16 ~ V4 + V6 + V9 + V11 + V14 + V15, data = train.1, family='binomial')
+test.1 <- test[-which(test$V4 == 'l'),]
+
+pred <- c()
+for (i in 1:nrow(test.1)){
+  test.2 = as.data.frame(test.1[i,])
+
+if (predict(fit.2, test.2, type = 'response') >0.42){
+  pred[i] <- 1
+}else{pred
+  pred[i] <- 0
+  }
+}
+
+test.compare <- ifelse(test.1$V16 == '+', 1, 0)
+table.t <- table(pred, test.compare)
+acc.test <-(table.t[1,1]+table.t[2,2])/sum(table.t)
+
+
+
+# ridge penalty model
+
+# glmnet allows input as matrix, but data in the matrix must be of the same type.
+# Transform all categorical data into dummy according to the previous glm.
+library(glmnet)
+train.2 <- cbind(train.1$V1, train.1$V2, train.1$V3, train.1$V4, train.1$V5, train.1$V6, train.1$V7, train.1$V8, train.1$V9, train.1$V10, train.1$V11, train.1$V12, train.1$V13, train.1$V14, train.1$V15)
+
+x <- train.2
+y <- as.factor(train.1[,16])
+fit.rid <- glmnet(x, y, family='binomial', alpha=0)
+
+
+# The best lambda
+lambda.seq <- fit.rid$lambda
+pi0 <- seq(0, 1, length.out = 101)
+correct.num <- matrix(0, length(lambda.seq), length(pi0))
+Sys.time()
+for (i in 1:nrow(train.1)){
+  print(paste0("i = ", i))
+  x.train <- matrix(x[-i,], nc = ncol(x))
+  x.test <- matrix(x[i,], 1, ncol(x))
+  y.train <- y[-i]
+  y.test <- y[i]
+  fit.rid.train <- glmnet(x.train, y.train, family='binomial', alpha = 0)
+  for (j in 1:length(lambda.seq)){
+    pred.prob <- predict(fit.rid.train, newx = x.test, s = lambda.seq[j], type = 'response' )
+    for (k in 1:length(pi0)){
+      if (pred.prob >= pi0[k]){
+        y.pred.1 = 1
+      }else{
+        y.pred.1 = 0
+      }
+      if ((y.test == 1) & (y.pred.1 == 1)){
+        correct.num[j,k] = correct.num[j,k] + 1
+      }
+      if ((y.test == 0) & (y.pred.1 == 0)){
+        correct.num[j,k] = correct.num[j,k] + 1
+      }
+    }
+  }
+  print(Sys.time())
+  print(i)
+}
+
+#save(file ='./categorical_q2.rdata', list = c('correct.num', 'roc.rid', 'auc.rid', 'acc.rid', 'sen.rid', 'spe.rid'))
+
+load(file = './categorical_q2.rdata')
+accuracy = correct.num/nrow(train.1)
+max(accuracy)
+which(accuracy == max(accuracy), arr.ind = TRUE)
+lambda.seq[93]
+lambda.seq[94]
+lambda.seq[96]
+lambda.seq[100]
+
+pi0[53]
+pi0[53]
+pi0[54]
+pi0[55]
+
+
+# ROC of ridge penalty
+
+fit.rid.train2 <- glmnet(x.train, y.train, family='binomial', alpha = 0)
+cut.rid <- seq(1, 0, length.out = 100)
+roc.rid <- c()
+sen.rid <- c()
+for (k in i:length(cut.rid)){
+  table_11 = table_12 = table_21 = table_22 = 0
+for (i in 1:nrow(train.2)){
+if (predict(fit.rid.train2, matrix(train.2[i,], nr=1),
+            s = lambda.seq[93], type = 'response') > cut.rid[k]){
+  pred.rid = 1
+}else{
+  pred.rid = 0
+}
+  if ((pred.rid == 1)&(train.1[i,16] == 1)){
+    table_11 = table_11 + 1
+  }
+  if ((pred.rid == 0)&(train.1[i,16] == 1)){
+    table_21 = table_21 + 1
+  }
+  if ((pred.rid == 1)&(train.1[i,16] == 0)){
+    table_12 = table_12 + 1
+  }
+  if ((pred.rid == 0)&(train.1[i,16] == 0)){
+    table_22 = table_22 + 1
+  }
+}
+  sen.rid <- table_11 / (table_11 + table_21)
+  spe.rid <- table_22 / (table_22 + table_12)
+  roc.rid <- cbind(roc.rid, c(1 - spe.rid, sen.rid))
+}
+
+roc.rid = t(roc.rid)
+which.max(roc.rid[,1]+roc.rid[,2])
+plot(roc.rid, type = 's', xlab = '1-Specificity', ylab = 'Sensitivity')
+
+auc.rid <- sum(roc.rid[-100,1]*(roc.rid[-1,1]-roc.rid[-100,1]))
+
+acc.rid <- (1-roc.rid[, 1])*(301/538)+roc.rid[, 2]*(237/538)
+
+
+# apply to test data
+test.rid.1 <- c()
+test.3 <- cbind(test$V1,test$V2,test$V3,test$V4,test$V5,test$V6,test$V7,test$V8,test$V9,test$V10,test$V11,test$V12,test$V13,test$V14,test$V15)
+for (i in 1:nrow(test.3)){
+if (predict(fit.rid.train2, matrix(test.3[i,], nr=1),
+            s = lambda.seq[93], type = 'response') > 0.5353535){
+  test.rid.1[i] <- 1
+}else {
+  test.rid.1[i] <-0
+}
+}
+
+test.compare <- ifelse(test$V16 == '+', 1, 0)
+table.t2 <- table(test.rid.1, test.compare)
+acc.test2 <-(table.t2[1,1]+table.t2[2,2])/sum(table.t2)
+
+# Combine 2 ROC curve
+plot(roc.rid, type = 's', xlab = '1-Specificity', ylab = 'Sensitivity')
+points(1-spe, sen, type = 's', col = 2)
+legend('bottomright',
+       legend = c('Model selection on AIC', 'Ridge penalty'),
+       col = 1:2, lty = 1)
+
+
+```

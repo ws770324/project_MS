@@ -1,0 +1,724 @@
+---
+title: "Maching Learning Project"
+author: "Joe"
+date: "2019/4/18"
+output: html_document
+---
+
+```{r}
+# setwd('C:\\Users\\User\\Desktop\\ML project')
+setwd(getwd())
+require(DMwR)
+require(e1071)
+require(class)
+require(randomForest)
+```
+
+```{r} 
+## KNN
+library('class')
+label.1 <- as.factor(label.1$V1)
+data1.knn <- knn(train.1, test.1, cl = label.1, k=13)
+## SVM
+library("e1071")
+data1.svm <- svm(train.1, label.1)
+predict(data1.svm, test.1)
+## NB
+data1.nb <- naiveBayes(train.1, label.1)
+predict(data1.nb, test.1)
+# random forest
+data1.rf <- randomForest(train.1, label.1)
+predict(data1.rf, test.1)
+```
+
+## Q1-1
+
+```{r}
+train.1 <- read.table('./TrainData1.txt')
+label.1 <- read.table('./TrainLabel1.txt')
+label.1 <- as.factor(label.1$V1)
+test.1 <-read.table('./TestData1.txt')
+
+### Missing value
+## mean
+for (j in 1:ncol(train.1)){
+  xx <- train.1[, j]
+  index <- which(xx == 1.00000000000000e+99)
+  train.1[index, j] <- mean(xx[-index])
+}
+
+### Accuracy
+## leave-one-out
+# svm = 0.9113
+time0 <- Sys.time()
+n_correct_1 = 0
+for (i in 1:nrow(train.1)){
+  train.out = train.1[-i,]
+  test.out = train.1[i,]
+  label.out = label.1[-i]  # label.1 is transformed to a vector in the previous chunk
+  label.t.out = label.1[i]
+  fit.svm <- svm(train.out, label.out)
+  if (predict(fit.svm, test.out) == label.t.out){
+    n_correct_1 = n_correct_1 + 1
+  }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_1 / nrow(train.1)
+
+# NB = 0.92
+time0 <- Sys.time()
+n_correct_1 = 0
+for (i in 1:nrow(train.1)){
+  train.out = train.1[-i,]
+  test.out = train.1[i,]
+  label.out = label.1[-i]  
+  label.t.out = label.1[i]
+  fit.nb <- naiveBayes(train.out, label.out)
+  if (predict(fit.nb, test.out) == label.t.out){
+    n_correct_1 = n_correct_1 + 1
+  }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_1 / nrow(train.1)
+
+# knn = 0.72  0.913 
+library('class')
+time0 <- Sys.time()
+n_correct_1 = 0
+for (i in 1:nrow(train.1)){
+  train.out = train.1[-i,]
+  test.out = train.1[i,]
+  label.out = label.1[-i] 
+  label.t.out = label.1[i]
+  fit.knn <- knn(train.out, test.out, cl = label.out, k=13)
+  if (fit.knn == label.t.out){
+    n_correct_1 = n_correct_1 + 1
+  }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_1 / nrow(train.1)
+
+# k=15,0.9;  k=14, 0.916; k=13,0.926; k=12,0.94; k=11,0.926
+
+# Random forest = 0.92
+time0 <- Sys.time()
+n_correct_1 = 0
+for (i in 1:nrow(train.1)){
+  train.out = train.1[-i,]
+  test.out = train.1[i,]
+  label.out = label.1[-i] 
+  label.t.out = label.1[i]
+  fit.rf <- randomForest(train.out, label.out)
+  if (predict(fit.rf, test.out) == label.t.out){
+    n_correct_1 = n_correct_1 + 1
+  }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_1 / nrow(train.1)
+
+
+```
+
+## Q1-1 Decision and output
+```{r}
+library('class')
+train.1 <- read.table('./TrainData1.txt')
+label.1 <- read.table('./TrainLabel1.txt')
+label.1 <- as.factor(label.1$V1)
+test.1 <-read.table('./TestData1.txt')
+for (j in 1:ncol(train.1)){
+  xx <- train.1[, j]
+  index <- which(xx == 1.00000000000000e+99)
+  train.1[index, j] <- mean(xx[-index])
+}
+q1.knn <- knn(train.1, test.1, cl = label.1, k=12)
+
+#write.table(q1.knn,file="TsaiClassification1.txt",col.names=FALSE,row.names=FALSE,quote=FALSE)
+```
+
+
+
+## Q1-2
+
+```{r}
+## 2
+# loading
+# setwd('C:\\Users\\User\\Desktop\\ML project')
+train.2 <- read.table('./TrainData2.txt')
+label.2 <- read.table('./TrainLabel2.txt')
+label.2 <- as.factor(label.2$V1)
+test.2 <-read.table('./TestData2.txt')
+# no missing value at this data set
+which(train.2 == 1.00000000000000e+99, arr.ind = T)
+
+# Accuracy 10-fold
+splitset <- split(sample(nrow(train.2)), rep(1:10,10))
+n_correct_2 = 0
+for (i in 1:length(splitset)){
+  train.out = train.2[-splitset[[i]],]
+  test.out = test.2[splitset[[i]],]
+  label.out = label.2[-splitset[[i]]]
+  label.t.out = label.2[splitset[[i]]]
+  fit.svm <- svm(train.out, label.out)
+  
+  for (j in 1:length(splitset[[i]])){
+    if (predict(fit.svm, test.out[j,]) == label.t.out[j] ){
+      n_correct_2 = n_correct_2 +1
+    }
+  }
+}
+n_correct_2 / nrow(train.2)
+
+# leave-one-out
+# 9 features have only one different value, which would make leave-one-out out train.2 <- read.table('./TrainData2.txt')
+label.2 <- read.table('./TrainLabel2.txt')
+label.2 <- as.factor(label.2$V1)
+out <- c(1937, 7435, 6468, 4420, 1360, 57, 3298, 67, 7303, 3601)
+train.2.out <- train.2[,-out]
+
+k.list <-c()
+time0 <- Sys.time()
+for (g in 1:99){
+n_correct = 0
+  for (i in 1:nrow(train.2.out)){
+  train.out <- train.2.out[-i,]
+  test.out <- train.2.out[i,]
+  label.out <- label.2[-i]
+  label.t.out <- label.2[i]
+  fit.knn <- knn(train.out, test.out, cl = label.out, k = g)
+  if (fit.knn == label.t.out){
+    n_correct = n_correct + 1
+  }
+}
+nn <-n_correct / nrow(train.2.out)
+k.list <- cbind(k.list, nn)
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+  }
+  
+######################################################################
+train.2 <- read.table('./TrainData2.txt')
+label.2 <- read.table('./TrainLabel2.txt')
+label.2 <- as.factor(label.2$V1)
+out <- c(1937, 7435, 6468, 4420, 1360, 57, 3298, 67, 7303, 3601)
+train.2.out <- train.2[,-out]
+n_correct = 0
+for (i in 1:nrow(train.2.out)){
+  train.out <- train.2.out[-i,]
+  test.out <- train.2.out[i,]
+  label.out <- label.2[-i]
+  label.t.out <- label.2[i]
+  #fit.knn <- knn(train.out, test.out, cl = label.out, k = 10)
+  #if (fit.knn == label.t.out){
+  fit.rf <- randomForest(train.out, label.out)
+  if (predict(fit.rf, test.out) == label.t.out){
+    n_correct = n_correct + 1
+  }
+}
+n_correct / nrow(train.2.out)
+
+######################################################################
+
+train.2.out$V3601
+
+# svm = 0.8
+# NB = 0.86
+# knn = 0.83
+# RF = 0.9
+
+## classification
+# RF
+
+```
+
+## Q1-2 Decision and output
+```{r}
+library('randomForest')
+train.2 <- read.table('./TrainData2.txt')
+label.2 <- read.table('./TrainLabel2.txt')
+label.2 <- as.factor(label.2$V1)
+test.2 <-read.table('./TestData2.txt')
+
+q2.rf <- randomForest(train.2, label.2)
+cla.2 <- predict(q2.rf, test.2)
+
+```
+
+
+## Q1-3
+
+```{r}
+## 3
+# loading
+# setwd('C:\\Users\\User\\Desktop\\ML project')
+setwd(getwd())
+train.3 <- read.table('./TrainData3.txt')
+label.3 <- read.table('./TrainLabel3.txt')
+label.3 <- as.factor(label.3$V1)
+test.3 <-read.table('./TestData3.txt', sep = ',')
+
+# missing value
+# which(train.3 == 1.00000000000000e+99)
+
+for (j in 1:ncol(train.3)){
+  xx <- train.3[, j]
+  index <- which(xx == 1.00000000000000e+99)
+  train.3[index, j] <- mean(xx[-index])
+}
+
+## Accuracy
+
+# leave one out
+n_correct_3.1 = 0
+for (i in 1:nrow(train.3)){
+  train.out <- train.3[-i,]
+  label.out <- label.3[-i]
+  test.out <- train.3[i,]
+  label.t.out <- label.3[i]
+  fit.knn <- knn(train.out, test.out, cl = label.out, k = 3)
+  if (fit.knn == label.t.out){
+    n_correct_3.1 = n_correct_3.1 +1
+  }
+}
+n_correct_3.1/nrow(train.3)
+
+# 10-fold
+k.list<-c()
+for (g in 1:6299){
+n <- 10
+splitset <- split(sample(nrow(train.3)), rep(1:n, 6300/n))
+n_correct_3 = 0
+for (i in 1:length(splitset)){
+  train.out = train.3[-splitset[[i]],]
+  test.out = train.3[splitset[[i]],]
+  label.out = label.3[-splitset[[i]]]
+  label.t.out = label.3[splitset[[i]]]
+  fit.knn <- knn(train.out, test.out, cl = label.out, k = g)
+
+  #fit.rf <- svm(train.out, label.out)
+  #out.pred <- predict(fit.rf, test.out)
+  out.pred <- fit.knn
+  n_correct_3 <- n_correct_3 + length(which(out.pred == label.t.out))
+  # if (fit.knn == label.t.out){
+  #   n_correct_3 = n_correct_3 + 1
+  # }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+#   for (j in 1:length(splitset[[i]])){
+#     # if (fit.svm[j] == label.t.out[j] ){
+#     if (predict(fit.svm, test.out[j, ]) == label.t.out[j]){
+#       
+#       n_correct_3 = n_correct_3 +1
+#     }
+#   }
+}
+kk<-n_correct_3 / nrow(train.3)
+k.list <- cbind(k.list, kk)
+}
+n_correct_3 / nrow(train.3)
+#Knn
+# 0.334 (k=166)
+# svm
+# 0.3406 0.3333 0.3362
+# Naive Bayes
+# 0.2984
+# Random Forest
+# 0.3392  0.3419  0.3370
+
+# New code
+new.label.1 <- ifelse(label.3 %in% 1:3, 1, ifelse(label.3 %in% 4:6, 2, 3))
+new.label.1 <- as.factor(new.label.1)
+n <- 10
+splitset <- split(sample(nrow(train.3)), rep(1:n, 6300/n))
+splitout <- c()
+n_correct_3 = 0
+for (i in 1:length(splitset)){
+  train.out = train.3[-splitset[[i]], ]
+  test.out = train.3[splitset[[i]], ]
+  label.out = new.label.1[-splitset[[i]]]
+  label.t.out = new.label.1[splitset[[i]]]
+  fit.svm <- svm(train.out, label.out)
+  
+  out.pred <- predict(fit.svm, test.out)
+  splitout <- c(splitout, out.pred)
+  n_correct_3 <- n_correct_3 + length(which(out.pred == label.t.out))
+}
+n_correct_3 / nrow(train.3)
+
+n_correct_3.1 <- 0
+for (j in 1:3){
+  index <- as.numeric(names(splitout)[which(splitout == j)])
+  subtrain <- train.3[index, ]
+  sublabel <- label.3[index]
+  group <- sample(rep(1:n, ceiling(length(index)/n))[1:length(index)])
+  
+  for (i in 1:10){
+    i.split <- which(group == i)
+    train.out = subtrain[-i.split, ]
+    test.out = subtrain[i.split, ]
+    label.out = sublabel[-i.split]
+    label.t.out = sublabel[i.split]
+    fit.svm <- svm(train.out, label.out)
+  
+    out.pred <- predict(fit.svm, test.out)
+    n_correct_3.1 <- n_correct_3.1 + length(which(out.pred == label.t.out))
+  }
+}
+
+# Random forest
+time0 <- Sys.time()
+n_correct_3 = 0
+for (i in 1:nrow(train.3)){
+  train.out = train.3[-i,]
+  test.out = train.3[i,]
+  label.out = label.3[-i] 
+  label.t.out = label.3[i]
+  fit.rf <- randomForest(train.out, label.out)
+  if (predict(fit.rf, test.out) == label.t.out){
+    n_correct_3 = n_correct_3 + 1
+  }
+  print(paste0('i = ', i))
+  
+  time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_3 / nrow(train.3)
+
+## classification
+# RF
+library(randomForest)
+train.3 <- read.table('./TrainData3.txt')
+for (j in 1:ncol(train.3)){
+  xx <- train.3[, j]
+  index <- which(xx == 1.00000000000000e+99)
+  train.3[index, j] <- mean(xx[-index])
+}
+label.3 <- read.table('./TrainLabel3.txt')
+label.3 <- as.factor(label.3$V1)
+test.3 <-read.table('./TestData3.txt')
+q3.rf <- randomForest(train.3, label.3)
+predict(q3.rf, test.3)
+
+
+```
+
+## Q1-3 Decision and output
+```{r}
+library('randomForest')
+train.3 <- read.table('./TrainData3.txt')
+label.3 <- read.table('./TrainLabel3.txt')
+label.3 <- as.factor(label.3$V1)
+test.3 <-read.table('./TestData3.txt', sep = ',')
+for (j in 1:ncol(train.3)){
+  xx <- train.3[, j]
+  index <- which(xx == 1.00000000000000e+99)
+  train.3[index, j] <- mean(xx[-index])
+}
+
+q3.rf <- randomForest(train.3, label.3)
+cla.3 <- predict(q3.rf, test.3)
+
+```
+
+## Q1-4
+
+```{r}
+## 4
+# loading
+setwd('C:\\Users\\User\\Desktop\\ML project')
+train.4 <- read.table('./TrainData4.txt')
+label.4 <- read.table('./TrainLabel4.txt')
+label.4 <- as.factor(label.4$V1)
+test.4 <-read.table('./TestData4.txt')
+
+# missing value = 0
+which(train.4 == 1.00000000000000e+99)
+
+# Accuracy
+time0 <- Sys.time()
+n_correct_4 = 0
+for ( i in 1:nrow(train.4)){
+  train.out <- train.4[-i,]
+  label.out <- label.4[-i]
+  test.out <- train.4[i,]
+  label.t.out <- label.4[i]
+  fit.svm <- svm(train.out, label.out)
+  if (predict(fit.svm, test.out) == label.t.out){
+    n_correct_4 = n_correct_4 +1
+  }
+    time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+n_correct_4/nrow(train.4)
+
+## 10-fold 
+
+# KNN  k=10 0.7279 k=5 0.7393 k=3 0.745 k=2 0.736
+# set.seed(10301)
+require(e1071)
+n <- 10
+splitset <- split(sample(nrow(train.4)), c(rep(1:3, 254),rep(4:10, 255)))
+n_correct_4 = 0
+for (i in 1:length(splitset)){
+  train.out = train.4[-splitset[[i]],]
+  test.out = train.4[splitset[[i]],]
+   label.out = label.4[-splitset[[i]]]
+   label.t.out = label.4[splitset[[i]]]
+  #label.out = new.label.4[-splitset[[i]]]
+  #label.t.out = new.label.4[splitset[[i]]]
+   fit.knn <- knn(train.out, test.out, cl = label.out, k = 3)
+  #fit.svm <- svm(train.out, label.out)
+  
+  for (j in 1:length(splitset[[i]])){
+     #if (fit.svm[j] == label.t.out[j] ){
+    #if (predict(fit.svm, test.out[j, ]) == label.t.out[j]){
+     if (fit.knn[j] == label.t.out[j]){ 
+      n_correct_4 = n_correct_4 +1
+    }
+  }
+}
+n_correct_4 / nrow(train.4)
+
+# SVM = 0.92  NB = 0.51 RF=0.967
+
+splitset <- split(sample(nrow(train.4)), c(rep(1:3, 254),rep(4:10, 255)))
+n_correct_4 = 0
+for (i in 1:length(splitset)){
+  train.out = train.4[-splitset[[i]],]
+  test.out = train.4[splitset[[i]],]
+   label.out = label.4[-splitset[[i]]]
+   label.t.out = label.4[splitset[[i]]]
+   fit.nb <- randomForest(train.out, label.out)
+    for (j in 1:length(splitset[[i]])){
+     if (predict(fit.nb, test.out[j,]) == label.t.out[j]){
+      n_correct_4 = n_correct_4 +1
+    }
+  }
+}
+n_correct_4 / nrow(train.4)
+
+## classification
+# RF
+library(randomForest)
+train.4 <- read.table('./TrainData4.txt')
+label.4 <- read.table('./TrainLabel4.txt')
+label.4 <- as.factor(label.4$V1)
+test.4 <-read.table('./TestData4.txt')
+q4.rf <- randomForest(train.4, label.4)
+predict(q4.rf, test.4)
+
+```
+
+## Q1-4 Decision and output
+```{r}
+library('randomForest')
+train.4 <- read.table('./TrainData4.txt')
+label.4 <- read.table('./TrainLabel4.txt')
+label.4 <- as.factor(label.4$V1)
+test.4 <-read.table('./TestData4.txt')
+
+q4.rf <- randomForest(train.4, label.4)
+cla.4 <- predict(q4.rf, test.4)
+```
+
+
+## Q1-5
+
+```{r}
+## 5
+# loading
+setwd('C:\\Users\\User\\Desktop\\ML project')
+train.5 <- read.table('./TrainData5.txt')
+label.5 <- read.table('./TrainLabel5.txt')
+label.5 <- as.factor(label.5$V1)
+test.5 <-read.table('./TestData5.txt')
+
+# missing value = 0
+which(train.5 == 1.00000000000000e+99)
+
+# Accuracy
+n_correct_5 = 0
+for ( i in 1:nrow(train.5)){
+  train.out <- train.5[-i,]
+  label.out <- label.5[-i]
+  test.out <- train.5[i,]
+  label.t.out <- label.5[i]
+  fit.svm <- svm(train.out, label.out)
+  if (predict(fit.svm, test.out) == label.t.out){
+    n_correct_5 = n_correct_5 +1
+  }
+}
+n_correct_5/nrow(train.5)
+
+# 10-fold 
+
+# KNN = 0.523 (k=536)
+require(e1071)
+splitset <- split(sample(nrow(train.5)), c(rep(1, 111),rep(2:10, 112)))
+rate.list <- c()
+for (g in 1:1118){
+  time0 <- Sys.time()
+n_correct_5 = 0
+for (i in 1:length(splitset)){
+  train.out = train.5[-splitset[[i]],]
+  test.out = train.5[splitset[[i]],]
+   label.out = label.5[-splitset[[i]]]
+   label.t.out = label.5[splitset[[i]]]
+   fit.knn <- knn(train.out, test.out, cl = label.out, k = 55)
+  for (j in 1:length(splitset[[i]])){
+     if (fit.knn[j] == label.t.out[j]){ 
+      n_correct_5 = n_correct_5 +1
+    }
+  }
+}
+rate <- n_correct_5 / nrow(train.5)
+rate.list <- cbind(rate.list, rate)
+ time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1}
+# SVM = 0.606  NB = 0.525 RF = 0.686
+splitset <- split(sample(nrow(train.5)), c(rep(1, 111),rep(2:10, 112)))
+n_correct_5 = 0
+for (i in 1:length(splitset)){
+  train.out = train.5[-splitset[[i]],]
+  test.out = train.5[splitset[[i]],]
+   label.out = label.5[-splitset[[i]]]
+   label.t.out = label.5[splitset[[i]]]
+   fit.nb <- svm(train.out, label.out)
+    for (j in 1:length(splitset[[i]])){
+     if (predict(fit.nb, test.out[j,]) == label.t.out[j]){
+      n_correct_5 = n_correct_5 +1
+    }
+  }
+}
+n_correct_5 / nrow(train.5)
+
+## classification
+# RF
+library(randomForest)
+train.5 <- read.table('./TrainData5.txt')
+label.5 <- read.table('./TrainLabel5.txt')
+label.5 <- as.factor(label.5$V1)
+test.5 <-read.table('./TestData5.txt')
+q5.rf <- randomForest(train.5, label.5)
+predict(q5.rf, test.5)
+
+```
+
+## Q1-5 Decision and output
+```{r}
+library('randomForest')
+train.5 <- read.table('./TrainData5.txt')
+label.5 <- read.table('./TrainLabel5.txt')
+label.5 <- as.factor(label.5$V1)
+test.5 <-read.table('./TestData5.txt')
+
+q5.rf <- randomForest(train.5, label.5)
+cla.5 <- predict(q5.rf, test.5)
+```
+
+
+
+## Q1-6
+
+```{r}
+## 6
+# loading
+setwd('C:\\Users\\User\\Desktop\\ML project')
+train.6 <- read.table('./TrainData6.txt')
+label.6 <- read.table('./TrainLabel6.txt')
+test.6 <-read.table('./TestData6.txt')
+
+# missing value = 0
+which(train.6 == 1.00000000000000e+99)
+
+# regression model - PCA
+names(label.6)[1] <- 'y'
+train.all <- cbind(train.6, label.6)
+out.pca <- prcomp(train.all)
+summary(out.pca)
+pc1 <- out.pca$x[,1]
+train.pc <- cbind(train.all, pc1)
+fit.pca <- lm(y ~ pc1, data = train.pc ) # PCA model 
+
+newdata.6 <- matrix(train.pc[, c('pc1')], nc = 1) # coeficients of each var. in pc1
+predict(fit.pca, test.6)
+
+cv.pca <- sqrt(mean((label.6$V1 - predict(fit.pca, as.data.frame(newdata.6)))^2))/mean(label.6$V1) # coefficient of variation
+
+
+# regression model - model selection
+ fit.reg <- lm(y ~ ., data = train.all)
+ select.1 <- step(fit.reg, direction='backward')
+ fit.select <-lm(y ~ V1 + V2 + V5 + V6 + V7 + V8 + V9 + V13 + V14 + 
+     V16 + V17 + V19 + V22 + V25 + V29 + V30 + V31 + V34 + V36 + 
+     V37 + V38 + V39 + V46 + V47 + V48 + V49 + V50 + V51 + V52 + 
+     V53 + V56 + V61 + V62 + V64 + V66 + V69 + V70 + V71 + V72 + 
+     V75 + V76 + V79 + V80 + V81 + V82 + V83 + V84 + V85 + V90 + 
+     V91 + V92 + V93 + V94 + V95 + V96 + V97 + V100 + V103 + V104 + 
+     V106 + V109 + V110 + V111 + V112 + V120 + V126 + V127 + V128 + 
+     V129 + V135 + V136 + V142, data = train.all)
+
+list.s <-c(1,2,5,6,7,8,9,13,14,16,17,19,22,25,29,30,31,34,36,37,38,39,46,47,48,49,50,51,52,53,56,61,62,64,66,69,70,71,72,75,76,79,80,81,82,83,84,85,90,91,92,93,94,95,96,97,100,103,104,106,109,110,111,112,120,126,127,128,129,135,136,142)  
+data.select <- train.6 [,list.s]
+cv.ms <- sqrt(mean((label.6$V1 - fit.select$fitted.values)^2))/mean(label.6$V1)
+
+# knn imputation
+test.mse <- q6.full
+predi.list <- c()
+for (i in 1:nrow(train.6)){
+  test.mse <- q6.full
+  test.mse[i,143] <- NA
+  q6.mse <- knnImputation(test.mse, k = 30)
+  pre.value <- q6.mse[i,143]
+  predi.list <- cbind(predi.list, pre.value)
+}
+cv.knn <- sqrt(mean((label.6$V1 - predi.list)^2))/mean(label.6$V1)
+   
+
+### KNN=0.7  MS = 0.5  PCA = <0.001
+# PCA + linear model
+predict(fit.pca, test.6)
+
+
+```
+
+## Q1-6 Decision and output
+```{r}
+train.6 <- read.table('./TrainData6.txt')
+label.6 <- read.table('./TrainLabel6.txt')
+test.6 <-read.table('./TestData6.txt')
+
+# names(label.6)[1] <- 'y'
+# train.all <- cbind(train.6, label.6)
+out.pca <- prcomp(train.6)
+pc1 <- out.pca$x[,1]
+# train.pc <- cbind(train.6, pc1)
+fit.pca <- lm(label.6$y ~ pc1) # PCA model
+test.pca <- as.data.frame(as.matrix(test.6) %*% matrix(out.pca$rotation[, 1], nc = 1))
+names(test.pca) <- 'pc1'
+pred.6 <- predict(fit.pca, test.pca)
+#write.table(pred.6, file = './q1-6.txt')
+```

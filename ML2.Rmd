@@ -1,0 +1,225 @@
+---
+title: "Machine Learning Project Question 2"
+author: "Joe"
+date: "2019/4/23"
+output: html_document
+---
+
+Q1
+
+```{r}
+# loading
+setwd('C:\\Users\\User\\Dropbox\\JT\\Machine learning\\ML project')
+miss.1 <- read.table('./MissingData1.txt')
+which(miss.1 == 1.00000000000000e+99)
+# convert NA
+for (i in 1:nrow(miss.1)){
+  for (j in 1:ncol(miss.1)){
+    if (miss.1[i,j] == 1.00000000000000e+99){
+      miss.1[i,j] = NA
+    }
+  }
+}
+
+## Use MSE to evaluate methods
+index.1 <- which(is.na(miss.1), arr.ind = T)
+complete <- miss.1[-index.1[,1], ]
+actu <- c()
+for (i in 1:nrow(complete)){
+    for (j in 1:ncol(complete)){
+    actu <- cbind(actu, complete[i,j])
+  }
+}
+
+# Bayes PCA missing value estimating = 0.25014
+pred <- c()
+for (i in 1:nrow(complete)){
+  for(j in 1:ncol(complete)){
+    index.1 <- which(apply(is.na(miss.1), 1, any))
+    complete <- miss.1[-index.1[,1], ]
+    complete[i,j] <- NA
+    pc <- pca(complete, nPcs=2, method='bpca')
+    aa <- completeObs(pc)
+    pred <- cbind(pred, aa[i,j]) 
+  }
+}
+MSE <- sqrt(mean((actu - pred)^2)) 
+
+# Accuracy of knn = 0.25016(9)
+index.1 <- which(apply(is.na(miss.1), 1, any))
+complete <- miss.1[-index.1[,1], ]
+
+mse.list <- c()
+time0 <- Sys.time()
+for (g in 1:147){
+  pred <- c()
+
+for (i in 1:nrow(complete)){
+  for(j in 1:ncol(complete)){
+    index.1 <- which(apply(is.na(miss.1), 1, any))
+    complete <- miss.1[-index.1, ]
+    complete[i,j] <- NA
+    complete.knn <- knnImputation(complete, k=g)
+    pred <- cbind(pred, complete.knn[i,j]) 
+  }
+}
+MSE <- sqrt(mean((actu - pred)^2))
+mse.list <- cbind(mse.list, MSE)
+ time1 <- Sys.time()
+  print(time1-time0)
+  time0 <- time1
+}
+# Accuracy of Mean  MSE = 0.3344
+pred.mean <- c()
+for (i in 1:nrow(complete)){
+  for (j in 1:ncol(complete)){
+    complete.mean <- mean(complete[-i,j])
+    pred.mean <- cbind(pred.mean, complete.mean)
+  }
+}
+pred.mean
+MSE.m <-sqrt(mean((actu-pred.mean)^2))
+
+# Accuracy of Median  MSE = 0.3359
+pred.med <- c()
+for (i in 1:nrow(complete)){
+  for (j in 1:ncol(complete)){
+    complete.med <- median(complete[-i,j])
+    pred.med <- cbind(pred.med, complete.med)
+  }
+}
+MSE.med <-sqrt(mean((actu-pred.med)^2))
+```
+
+## Q1 Decision and output
+```{r}
+# BPCA has the lowest MSE
+setwd('C:\\Users\\User\\Dropbox\\JT\\Machine learning\\ML project')
+miss.1 <- read.table('./MissingData1.txt')
+which(miss.1 == 1.00000000000000e+99)
+
+for (i in 1:nrow(miss.1)){
+  for (j in 1:ncol(miss.1)){
+    if (miss.1[i,j] == 1.00000000000000e+99){
+      miss.1[i,j] = NA
+    }
+  }
+}
+miss.1.est <- pca(miss.1, nPcs = 3, method = "bpca")
+miss.1.out <- completeObs(miss.1.est)
+#write.table(miss.1.out, file = './TsaiMissingResult1.txt')
+
+```
+
+
+Q2
+```{r}
+miss.2 <- read.table('./MissingData2.txt')
+for (i in 1:nrow(miss.2)){
+  for (j in 1:ncol(miss.2)){
+    if (miss.2[i,j] == 1.00000000000000e+99){
+      miss.2[i,j] = NA
+    }
+  }
+}
+
+
+## Use MSE to evaluate methods
+index.2 <- which(apply(is.na(miss.2), 1, any))
+complete.2 <- miss.2[-index.2, ]
+actu.2 <- c()
+for (i in 1:nrow(complete.2)){
+    for (j in 1:ncol(complete.2)){
+    actu.2 <- cbind(actu.2, complete.2[i,j])
+  }
+}
+
+# Bayes PCA missing value estimating = 0.36885
+pred <- c()
+for (i in 1:nrow(complete.2)){
+  for(j in 1:ncol(complete.2)){
+    index.2 <- which(apply(is.na(miss.2), 1, any))
+    complete.2 <- miss.2[-index.2, ]
+    complete.2[i,j] <- NA
+    est.bpca <- pca(complete.2, nPcs = 2, method = 'bpca')
+    est.out <- completeObs(est.bpca)
+    pred <- cbind(pred, est.out[i,j]) 
+  }
+}
+MSE <- sqrt(mean((actu.2 - pred)^2)) 
+mse(pred, actu.2)
+
+# Accuracy of knn  MSE=0.377(4) 0.384(3) 0.385(2)
+
+pred <- c()
+for (i in 1:nrow(complete.2)){
+  for(j in 1:ncol(complete.2)){
+    index.2 <- which(apply(is.na(miss.2), 1, any))
+    complete.2 <- miss.2[-index.2, ]
+    complete.2[i,j] <- NA
+    complete.2.knn <- knnImputation(complete.2, k=4)
+    pred <- cbind(pred, complete.2.knn[i,j]) 
+  }
+}
+MSE <- sqrt(mean((actu.2 - pred)^2)) 
+mse(pred, actu.2)
+
+# Accuracy of Mean  MSE = 0.388
+index.2 <- which(apply(is.na(miss.2), 1, any))
+complete.2 <- miss.2[-index.2, ]
+
+pred.mean <- c()
+for (i in 1:nrow(complete.2)){
+  for (j in 1:ncol(complete.2)){
+    complete.2.mean <- mean(complete.2[-i,j])
+    pred.mean <- cbind(pred.mean, complete.2.mean)
+  }
+}
+MSE.m <-sqrt(mean((actu.2-pred.mean)^2))
+
+# Accuracy of Median  MSE = 0.394
+index.2 <- which(apply(is.na(miss.2), 1, any))
+complete.2 <- miss.2[-index.2, ]
+
+pred.med <- c()
+for (i in 1:nrow(complete.2)){
+  for (j in 1:ncol(complete.2)){
+    complete.med <- median(complete.2[-i,j])
+    pred.med <- cbind(pred.med, complete.med)
+  }
+}
+MSE.med <-sqrt(mean((actu.2-pred.med)^2))
+```
+
+## Q2 Decision and output
+```{r}
+# BPCA has the lowest MSE
+miss.2 <- read.table('./MissingData2.txt')
+for (i in 1:nrow(miss.2)){
+  for (j in 1:ncol(miss.2)){
+    if (miss.2[i,j] == 1.00000000000000e+99){
+      miss.2[i,j] = NA
+    }
+  }
+}
+miss.2.est <- pca(miss.2, nPcs = 3, method = "bpca")
+miss.2.out <- completeObs(miss.2.est)
+#write.table(miss.2.out, file = './TsaiMissingResult2.txt')
+```
+
+## Q3 Decision and output
+```{r}
+miss.3 <- read.table('./MissingData3.txt')
+for (i in 1:nrow(miss.3)){
+  for (j in 1:ncol(miss.3)){
+    if (miss.3[i,j] == 1.00000000000000e+99){
+      miss.3[i,j] = NA
+    }
+  }
+}
+
+miss.3.est <- pca(miss.3, nPcs = 3, method = "bpca")
+miss.3.out <- completeObs(miss.3.est)
+#write.table(miss.3.out, file = './TsaiMissingResult3.txt')
+
+```
