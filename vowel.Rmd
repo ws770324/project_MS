@@ -1,0 +1,413 @@
+---
+title: "Multivariate Statistics Final"
+author: "Chen-Tze Tsai"
+date: "November 21, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+setwd("C:/Users/User/Desktop/Multivariate Statistics/Final")
+train <- read.table('vowel-train.txt', header = T, sep = ',')
+test <- read.table('vowel-test.txt', header = T, sep = ',')
+train.out <- train[,2] # training outcome
+train <- train[,3:12]
+test.out <- test[,2]# testing outcome
+test <- test[,3:12]
+```
+
+```{r Q1}
+# test
+# pc1.1 <- prcomp(train); summary(pc1.1)
+pc1 <- prcomp(train, scale. = T)
+summary(pc1)
+```
+
+The contributions of each eigenvalue to the total variance are (0.2332, 0.2142, 0.1981, 0.0931, 0.0765, 0.0633, 0.0496, 0.0404, 0.0246, 0.007).
+Thus, seven principal components can explain more than 90% of total variance. (92.8%)
+
+```{r Q2}
+require(MASS)
+train.out <- as.factor(train.out)
+train.pc <- pc1$x[,1:7]
+train.pc <- cbind(train.pc, train.out)
+train.pc <- as.data.frame(train.pc)
+lda.pc <- lda(train.out ~ ., train.pc)
+p.lp1 <- predict(lda.pc, train.pc)
+t.lp1 <- table(p.lp1$class, train.out)
+#error rate based on train
+err.lp1 <- 1 - sum(diag(t.lp1))/sum(t.lp1); err.lp1
+
+#transformation of testing data
+#standarize
+t.m <- apply(test, 2 ,mean); t.v <- sqrt(apply(test, 2, var))
+test.pc <- matrix(0, nc=ncol(test), nr= nrow(test))
+for (i in 1:ncol(test)){
+  test.pc[,i] <- (test[,i]-t.m[i])/t.v[i]
+}
+test.pc <- as.matrix(test.pc) %*% pc1$rotation[,1:7]
+test.pc <- as.data.frame(test.pc)
+#center
+# m.t <- t(apply(test, 2, mean))
+# m.t <- as.matrix(m.t) %*% pc1$rotation[,1:7]
+# for (i in 1:ncol(test.pc)){
+#   test.pc[,i] <- test.pc[,i] - m.t[i]
+# }
+# test.pc <- as.data.frame(test.pc)
+#predict the testing data
+p.lp2 <- predict(lda.pc, test.pc)
+t.lp2 <- table(p.lp2$class, test.out)
+err.lp2 <- 1 - sum(diag(t.lp2))/sum(t.lp2); err.lp2
+
+```
+The error rate of LDA based on training data is 0.3902.
+The error rate of LDA based on testing data is 0.5736.
+
+```{r Q3}
+# After PCA, QDA for training data set
+qda.pc <- qda(train.out ~ ., train.pc)
+p.qp1 <- predict(qda.pc, train.pc)
+t.qp1 <- table(p.qp1$class, train.out)
+err.qp1 <- 1- sum(diag(t.qp1))/sum(t.qp1); err.qp1
+# After PCA, use QDA to predict testing data set
+p.qp2 <- predict(qda.pc, as.data.frame(test.pc))
+t.qp2 <- table(p.qp2$class, test.out)
+err.qp2 <- 1 - sum(diag(t.qp2))/sum(t.qp2); err.qp2
+
+```
+The error rate of LDA based on training data is 0.0795.
+The error rate of LDA based on testing data is 0.5606.
+Thus, QDA gives lower error rate on both training and testing dataset although it only slightly reduced on testing dataset.
+
+```{r Q4}
+#LDA in original training data
+train.2 <- as.data.frame(cbind(train, train.out))
+lda.2 <- lda(train.out ~ ., train.2)
+p.l2 <- predict(lda.2, train.2)
+t.l2 <- table(p.l2$class, train.out)
+err.l2 <- 1 - sum(diag(t.l2))/sum(t.l2); err.l2
+#LDA in original testing data
+p.l3 <- predict(lda.2, as.data.frame(test))
+t.l3 <- table(p.l3$class, test.out)
+err.l3<- 1 - sum(diag(t.l3))/sum(t.l3);err.l3
+
+
+#QDA in original training data
+qda.2 <- qda(train.out ~ ., train.2)
+p.q2 <- predict(qda.2, train.2)
+t.q2 <- table(p.q2$class, train.out)
+err.q2 <- 1 - sum(diag(t.q2))/sum(t.q2); err.q2
+#QDA in original testing data
+p.q3 <- predict(qda.2, as.data.frame(test))
+t.q3 <- table(p.q3$class, test.out)
+err.q3 <- 1 - sum(diag(t.q3))/sum(t.q3);err.q3
+
+
+```
+The error rate of LDA and QDA reduced around 7% on training data, but it did not reduced significantly (1~2%) on testing data.
+
+     Train  Test
+LDA  0.316  0.556
+QDA  0.011  0.528
+
+From the results of (2) ~ (4), we have some conclusions:
+1. Conducting a principal component analysis does not increase the accuracy of discrimination, no matter for LDA or QDA. The error rate of discrimination decreased when we tried to use original data.
+2. For training data, QDA is more accurate than LDA, so the boundary of discrimination might be nonlinear.
+3. For testing data, the error rate reduced slightly after PCA, but the error rate is higher than 50% whether we conduct PCA or not.
+4. Similarily, QDA also performed better than LDQ on testing data even thought the error rate is still more than 50%.
+5. The QDA model showed impressive error rate on original training data (only 1 %), but it still did not work well on testing data. Therefore, we might claim that the QDA model based on training data cannot be applied on testing data.
+
+We will try to construct LDA and QDA model based on testing data and calculate the misclassification error rate of testing data.
+
+```{r Q4 testing + LDA & QDA}
+require(MASS)
+setwd("C:/Users/User/Desktop/Multivariate Statistics/Final")
+train <- read.table('vowel-train.txt', header = T, sep = ',')
+test <- read.table('vowel-test.txt', header = T, sep = ',')
+test.disc <- test[,-1]
+# LDA
+lda.test <- lda(y ~ ., test.disc)
+test.data <- test[,-c(1:2)]
+p.Ltest <- predict(lda.test, test.data)
+t.Ltest <- table(test[,2], p.Ltest$class)
+e.Ltest <- 1 - sum(diag(t.Ltest))/sum(t.Ltest)
+#QDA
+qda.test <- qda(y ~ ., test.disc)
+p.Qtest <- predict(qda.test, test.data)
+t.Qtest <- table(test[,2], p.Qtest$class)
+e.Qtest <- 1 - sum(diag(t.Qtest))/sum(t.Qtest)
+# predict training data
+p.Ltrain <- predict(lda.test, train[,-c(1:2)])
+t.Ltrain <- table(train[,2], p.Ltrain$class)
+e.Ltrain <- 1 - sum(diag(t.Ltrain))/sum(t.Ltrain)
+p.Qtrain <- predict(qda.test, train[,-c(1:2)])
+t.Qtrain <- table(train[,2], p.Qtrain$class)
+e.Qtrain <- 1 - sum(diag(t.Qtrain))/sum(t.Qtrain)
+# comparison
+e.Ltrain; e.Ltest; e.Qtrain; e.Qtest
+
+```
+
+We can see the testing-based LDA and QDA model work well on classify testing data and they also have higher error rate (more than 50%) when we apply the discriminant rult to the training data. Therefore, we conclude that: the discriminant rule based on training/testing data cannot be applied to testing/training data. It might be the reason that the pronunciation are quite different from people to people. The discriminant rule might not work well when the data is from different group of people.
+
+
+```{r Q5}
+# class with highest err rate (hard to classify)
+err.qda2 <- err.qda1 <- err.lda1 <- err.lda2 <- c()
+#lda + train
+for (i in 1:11){
+  err.lda1[i] <- 1 - diag(t.l2)[i]/sum(t.l2[,i])
+}
+# lda + test
+for (i in 1:11){
+  err.lda2[i] <- 1 - diag(t.l3)[i]/sum(t.l3[,i])
+}
+#qda + train
+for (i in 1:11){
+  err.qda1[i] <- 1 - diag(t.q2)[i]/sum(t.q2[,i])
+}
+#qda + test
+for (i in 1:11){
+  err.qda2[i] <- 1 - diag(t.q3)[i]/sum(t.q3[,i])
+}
+#class with highest err
+err.bind <- cbind(err.lda1, err.lda2, err.qda1, err.qda2)
+out.max <- c()
+for (i in 1:4){
+  out.max[i] <- which.max(err.bind[,i]) 
+}
+out.max
+```
+
+The outcome shows that testing data has the highest error rate on the class 5 when conducting LDA, and has the highest error rate on the class 8 when conducting QDA. 
+
+```{r Q5 remove class 5 for LDA}
+# select data
+setwd("C:/Users/User/Desktop/Multivariate Statistics/Final")
+train <- read.table('vowel-train.txt', header = T, sep = ',')
+test <- read.table('vowel-test.txt', header = T, sep = ',')
+train <- train[,-1]
+test <- test[,-1]
+
+omit <- which(train$y == 5)
+train.5 <- train[-omit, -1]
+out.5 <- as.factor(train[-omit, 1])
+omit.1 <- which(test$y == 5)
+test.5 <- test[-omit.1, -1]
+out1.5 <- as.factor(test[-omit.1, 1])
+
+#LDA
+lda.5 <- lda(out.5 ~ ., train.5)
+pre.l5 <- predict(lda.5, train.5)
+t.l5 <- table(out.5, pre.l5$class)
+err.l5 <- 1 - sum(diag(t.l5))/sum(t.l5); err.l5
+
+# each.l6 <- c()
+# for (i in 1:10){
+#   each.l6[i] <- 1 - diag(t.l6)[i]/sum(t.l6[,i])
+# }
+
+pre1.l5 <- predict(lda.5, test.5)
+t1.l5 <- table(out1.5, pre1.l5$class)
+err1.l5 <- 1- sum(diag(t1.l5))/sum(t1.l5); err1.l5
+```
+
+After taking off the class 5, the LDA rule performed better on both training and testing data. We try to remove one more class.
+
+    train  test
+LDA 0.2833  0.519
+
+```{r 2nd highest error rate class LDA}
+err.train.l5 <- err.test.l5 <- c()
+# train + LDA
+for (i in 1:10){
+  err.train.l5[i] <- 1 - diag(t.l5)[i]/sum(t.l5[,i])
+}
+# test + LDA
+for (i in 1:10){
+  err.test.l5[i] <- 1 - diag(t1.l5)[i]/sum(t1.l5[,i])
+}
+
+which.max(err.train.l5)
+which.max(err.test.l5)
+
+```
+
+Class 10 has the highest error rate in this step, so we remove this class and calculate the error rate.
+
+```{r Q5 remove class 10 for LDA}
+# select data
+omit <- c(which(train$y == 5), which(train$y == 10))
+train.510 <- train[-omit, -1]
+out.510 <- as.factor(train[-omit, 1])
+
+omit.1 <- c(which(test$y == 5), which(test$y == 10))
+test.510 <- test[-omit.1, -1]
+out1.510 <- as.factor(test[-omit.1, 1])
+
+#LDA
+lda.510 <- lda(out.510 ~ ., train.510)
+pre.l510 <- predict(lda.510, train.510)
+t.l510 <- table(out.510, pre.l510$class)
+err.l510 <- 1 - sum(diag(t.l510))/sum(t.l510); err.l510
+
+pre1.l510 <- predict(lda.510, test.510)
+t1.l510 <- table(out1.510, pre1.l510$class)
+err1.l510 <- 1- sum(diag(t1.l510))/sum(t1.l510); err1.l510
+```
+After we remove class 10, the error rate of LDA diseased again.
+
+
+```{r Q5 remove class 8 for QDA}
+# select data
+omit <- which(train$y == 8)
+train.8 <- train[-omit, -1]
+out.8 <- as.factor(train[-omit, 1])
+omit.1 <- which(test$y == 8)
+test.8 <- test[-omit.1, -1]
+out1.8 <- as.factor(test[-omit.1, 1])
+
+#QDA 
+qda.8 <- qda(out.8 ~ ., train.8)
+pre.q8 <- predict(qda.8, train.8)
+t.q8 <- table(out.8, pre.q8$class)
+err.q8 <- 1 - sum(diag(t.q8))/sum(t.q8); err.q8
+
+pre1.q8 <- predict(qda.8, test.8)
+t1.q8 <- table(out1.8, pre1.q8$class)
+err1.q8 <- 1- sum(diag(t1.q8))/sum(t1.q8); err1.q8
+
+```
+After taking off the class 8, the QDA rule worked better on testing data.
+
+    train  test
+QDA 0.0125  0.4952
+
+Then, we'll try to remove one more class.
+
+```{r Q5 2nd high error rate class QDA}
+err.train.q8 <- err.test.q8 <- c()
+
+# train + QDA
+for (i in 1:10){
+  err.train.q8[i] <- 1 - diag(t.q8)[i]/sum(t.q8[,i])
+}
+# test + QDA
+for (i in 1:10){
+  err.test.q8[i] <- 1 - diag(t1.q8)[i]/sum(t1.q8[,i])
+}
+
+which.max(err.train.q8)
+which.max(err.test.q8)
+```
+
+QDA model has the highest rate on class 7.
+
+
+
+```{r Q5 remove class 7 for QDA}
+# select data
+omit <- c(which(train$y == 8), which(train$y == 7))
+train.87 <- train[-omit, -1]
+out.87 <- as.factor(train[-omit, 1])
+
+omit.1 <- c(which(test$y == 8), which(test$y == 7))
+test.87 <- test[-omit.1, -1]
+out1.87 <- as.factor(test[-omit.1, 1])
+
+#QDA 
+qda.87 <- qda(out.87 ~ ., train.87)
+pre.q87 <- predict(qda.87, train.87)
+t.q87 <- table(out.87, pre.q87$class)
+err.q87 <- 1 - sum(diag(t.q87))/sum(t.q87); err.q87
+
+pre1.q87 <- predict(qda.87, test.87)
+t1.q87 <- table(out1.87, pre1.q87$class)
+err1.q87 <- 1- sum(diag(t1.q87))/sum(t1.q87); err1.q87
+
+```
+After removing two classes, both LDA and QDA rules worked better and the error rates are less than 50%. 
+
+    Train   Test
+LDA 0.2407  0.4471
+QDA 0.0139  0.4259
+
+```{r Q6 data preparation}
+require(stats)
+setwd("C:/Users/User/Desktop/Multivariate Statistics/Final")
+train <- read.table('vowel-train.txt', header = T, sep = ',')
+test <- read.table('vowel-test.txt', header = T, sep = ',')
+
+# keep class = c(1,3,6,10)
+keep <- keep.1 <- c()
+for (i in c(1,3,6,10)){
+    keep <- which(train$y == i)
+    keep.1 <- c(keep,keep.1)
+}
+train.1 <- train[keep.1, 3:12]
+train.out <- train[keep.1, 2]
+```
+
+Flow:
+1. Use ward's method to conduct hierarchical clustering
+2. Used elbow method to determine the optimal number of clusters
+3. Construct a summary table
+```{r Q6 hcluster}
+# hcluster ward 
+train.d <- dist(train.1)
+cluster.w <- hclust(train.d, "ward.D2")
+plot(cluster.w, main="ward.D2")
+# the best cluster number
+require(factoextra)
+fviz_nbclust(train.1, FUNcluster = hcut, method='wss', k.max=12)
+# cluster number = 4
+group.w4 <- cutree(cluster.w, k = 4)
+t.w4 <- table(train.out, group.w4); t.w4
+
+```
+We decided the number of clusters (4) because the total within sum of declined slower and slower after k = 4.  
+We compared the clustering result with the label. We can see
+1. All the outcomes of class 6 perfectly clustered into the same group, so the vowel sound might be distinct comparing to the others.
+2. Most of the observations of class 6 are in the group 3, and it's a distinct class as well. 
+3. Members of class 1 and class 3 are mostly classified in group 1 and group 4, so these two vowel sounds might be hard to distinguish.
+
+
+Flow:
+1. Used elbow method to determine the optimal number of clusters
+2. Conduct kmeans clustering
+3. Visulization and construct summary table
+```{r Q6 kmeans}
+require(factoextra)
+fviz_nbclust(train.1, FUNcluster = kmeans, method='wss', k.max=12)
+
+# center = 4
+km.4 <- kmeans(train.1, centers = 4)
+t.km4 <- table(train.out, km.4$cluster)
+fviz_cluster(km.4, data = train.1)
+t.km4
+```
+The optimal number of clusters is also 4 in kmeans method.
+Based on the graph and the summary table, we can see:
+1. Only one of the observations in class 6 is classified to group 4, so this class is also distinct by kmeans method, which is consistent with the result of hierarchical method.
+2. In class 1 and class 3, the summary table showed the same result of the summary table of hierarchical method: they might be hard to distinguish.
+3. Class 10 might be more confusing if useing kmeans method. More than 1/3 of the observations are in the different group.
+
+
+```{r Q6 model-based cluster}
+# model-based
+require(mclust)
+mbbic <- mclustBIC(train.1)
+msc <- Mclust(train.1)
+t.mc <- table(train.out, msc$classification); t.mc
+#plot(mbbic,  what = c("BIC", "classification", "uncertainty", "density"))
+#dmsc <- MclustDR(msc, lambda = 1)
+#plot(msc)
+# VEV,9
+
+```
+
+The summary table of model-based method is quite differnt from hierarchical method and kmeans method.
+1. VEV model has the highest BIC, -2507, and the optimal number of clusters is 9.
+2. Class 10 is the more distinct than class 6. Only 6 of the members are classified to the different group. However, the observations of class 6 are seperated into three group.
+3. Class 3 and class 1 are hard to distinghish by this method either. Members in class 3 are seperated into 4 groups and members in class 1 are seperated into 5 groups. 
